@@ -1,3 +1,4 @@
+# coding: utf-8
 """
 terminal reporting of the full testing process.
 """
@@ -350,6 +351,35 @@ class TestFixtureReporting(object):
             "*1 error*",
         ])
         assert result.ret != 0
+
+    @pytest.mark.xfail("sys.version_info[0] < 3")
+    def test_setup_fixture_error_with_mixed_encoding(self, testdir):
+        testdir.makepyfile("""
+            # coding: utf-8
+            def mixed_encoding(as_unicode, as_utf8):
+                assert 0
+            def setup_function(function):
+                mixed_encoding(u"'São Paulo'", "'S\xc3\xa3o Paulo'")
+            def test_nada():
+                pass
+        """)
+        result = testdir.runpytest()
+        result.stdout.fnmatch_lines([
+            "*ERROR at setup of test_nada*",
+            "*setup_function(function):*",
+            "*mixed_encoding(as_unicode, as_utf8):*",
+            "*assert 0*",
+            "*1 error*",
+        ])
+        assert result.ret != 0
+        if sys.version_info[0] >= 3:
+            result.stdout.fnmatch_lines([
+                "*as_unicode = \"'São Paulo'\", as_utf8 = \"'SÃ£o Paulo'\"*",
+            ])
+        else:
+            result.stdout.fnmatch_lines([
+                "*as_unicode = \"'São Paulo'\", as_utf8 = \"'São Paulo'\"*",
+            ])
 
     def test_teardown_fixture_error(self, testdir):
         testdir.makepyfile("""
